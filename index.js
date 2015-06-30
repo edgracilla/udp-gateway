@@ -5,12 +5,12 @@ var _             = require('lodash'),
 	StringDecoder = require('string_decoder').StringDecoder,
 	decoder       = new StringDecoder('utf8');
 
-exports.init = function (endpointId, options, queues) {
-	var taskQueue = queues.taskQueue;
-	var messageQueue = queues.messageQueue;
+exports.init = function (options, imports) {
+	var taskQueue = imports.taskQueue;
+	var messageQueue = imports.messageQueue;
 
 	var serverAddress = host + '' + options.port;
-	var server = require('./lib')(options.port, host);
+	var server = require('./server')(options.port, host);
 
 	server.on('ready', function () {
 		// TODO: Send a 'listening' event to the parent process.
@@ -19,7 +19,6 @@ exports.init = function (endpointId, options, queues) {
 	server.on('data', function (client, rawData) {
 		var data = decoder.write(rawData);
 		var payload = {
-			endpoint: endpointId,
 			server: serverAddress,
 			client: client,
 			data: data
@@ -41,9 +40,6 @@ exports.init = function (endpointId, options, queues) {
 	server.bind();
 
 	messageQueue.subscribe(function (message) {
-		console.log('Message Received.');
-		console.log(message);
-
 		if (message.server === serverAddress && _.contains(_.keys(server.getClients()), message.client)) {
 			server.send(message.client, message.message);
 
