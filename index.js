@@ -13,7 +13,12 @@ exports.init = function (options, imports) {
 	var server = require('./server')(options.port, host);
 
 	server.on('ready', function () {
-		// TODO: Send a 'listening' event to the parent process.
+
+		process.send({
+			type: 'listening'
+		});
+
+
 	});
 
 	server.on('data', function (client, rawData) {
@@ -26,16 +31,42 @@ exports.init = function (options, imports) {
 
 		taskQueue.send(payload);
 
-		// TODO: Send a 'log' event to the parent process to log the incoming data.
+		process.send({
+			type: 'log',
+			data: data
+		});
 	});
 
 	server.on('error', function (error) {
-		// TODO: Send a 'error' event to the parent process to log the error.
+
+		process.send({
+			type: 'error',
+			error: error
+		});
 	});
 
 	server.on('close', function () {
-		// TODO: Send a 'close' event to the parent process.
+
+		process.send({
+			type: 'close'
+		});
 	});
+
+
+	server.on('SIGTERM', function() {
+
+		process.send({
+			type: 'SIGTERM'
+		});
+	});
+
+	server.on('uncaughtException', function() {
+
+		process.send({
+			type: 'uncaughtException'
+		});
+	});
+
 
 	server.bind();
 
@@ -43,7 +74,10 @@ exports.init = function (options, imports) {
 		if (message.server === serverAddress && _.contains(_.keys(server.getClients()), message.client)) {
 			server.send(message.client, message.message);
 
-			// TODO: Send a 'log' event to the parent process to log the message sent to the device.
+			process.send({
+				type: 'log',
+				message: message.message
+			});
 		}
 	});
 };
