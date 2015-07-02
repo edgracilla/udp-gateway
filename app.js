@@ -3,9 +3,10 @@
 var _             = require('lodash'),
 	host          = require('ip').address(),
 	StringDecoder = require('string_decoder').StringDecoder,
-	decoder       = new StringDecoder('utf8');
+	decoder       = new StringDecoder('utf8'),
+	core          = require('./core');
 
-exports.init = function (options, imports) {
+core.on('ready', function (options, imports) {
 	var taskQueue = imports.taskQueue;
 	var messageQueue = imports.messageQueue;
 
@@ -13,12 +14,9 @@ exports.init = function (options, imports) {
 	var server = require('./server')(options.port, host);
 
 	server.on('ready', function () {
-
 		process.send({
 			type: 'listening'
 		});
-
-
 	});
 
 	server.on('data', function (client, rawData) {
@@ -38,7 +36,6 @@ exports.init = function (options, imports) {
 	});
 
 	server.on('error', function (error) {
-
 		process.send({
 			type: 'error',
 			error: error
@@ -46,27 +43,10 @@ exports.init = function (options, imports) {
 	});
 
 	server.on('close', function () {
-
 		process.send({
 			type: 'close'
 		});
 	});
-
-
-	server.on('SIGTERM', function() {
-
-		process.send({
-			type: 'SIGTERM'
-		});
-	});
-
-	server.on('uncaughtException', function() {
-
-		process.send({
-			type: 'uncaughtException'
-		});
-	});
-
 
 	server.bind();
 
@@ -80,4 +60,4 @@ exports.init = function (options, imports) {
 			});
 		}
 	});
-};
+});
