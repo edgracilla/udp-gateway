@@ -38,7 +38,7 @@ core.on('ready', function (options, imports) {
 	server.on('error', function (error) {
 		process.send({
 			type: 'error',
-			error: error
+			data: error
 		});
 	});
 
@@ -52,11 +52,22 @@ core.on('ready', function (options, imports) {
 
 	messageQueue.subscribe(function (message) {
 		if (message.server === serverAddress && _.contains(_.keys(server.getClients()), message.client)) {
-			server.send(message.client, message.message);
-
-			process.send({
-				type: 'log',
-				message: message.message
+			server.send(message.client, message.message, function (error) {
+				if (error) {
+					process.send({
+						type: 'error',
+						data: error
+					});
+				}
+				else {
+					process.send({
+						type: 'log',
+						data: {
+							title: 'Message Sent',
+							description: message.message
+						}
+					});
+				}
 			});
 		}
 	});
