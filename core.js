@@ -26,7 +26,7 @@ Core.init = function () {
 process.on('uncaughtException', function (error) {
 	process.send({
 		type: 'error',
-		error: error
+		data: error
 	});
 });
 
