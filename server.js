@@ -82,7 +82,7 @@ Server.prototype.close = function () {
 	return 1;
 };
 
-Server.prototype.bind = function (callback) {
+Server.prototype.listen = function (callback) {
 	if (!callback)
 		callback = function () {
 		};
