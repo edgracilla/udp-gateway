@@ -33,7 +33,7 @@ Server.init = function (port, host, socketType) {
 			port: requestInfo.port
 		};
 
-		self.emit('data', client, message.toString().replace(/\n$/, ''));
+		self.emit('data', client, message.toString().replace(/\n$/, ''), requestInfo.size);
 	}
 
 	function listening() {
