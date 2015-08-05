@@ -20,7 +20,7 @@ platform.on('ready', function (options) {
 
 	server.on('ready', function () {
 		console.log('UDP Server now listening on '.concat(host).concat(':').concat(options.port));
-		platform.sendListeningState();
+		platform.notifyListen();
 	});
 
 	server.on('data', function (clientAddress, rawData, size) {
@@ -28,9 +28,9 @@ platform.on('ready', function (options) {
 
 		safeParse(data, function (error, result) {
 			if (error)
-				platform.sendError(error);
+				platform.handleException(error);
 			else
-				platform.sendData(serverAddress, clientAddress, result, DATA_TYPE, size);
+				platform.processData(serverAddress, clientAddress, result, DATA_TYPE, size);
 		});
 
 		platform.sendLog('Raw Data Received', data);
@@ -38,11 +38,11 @@ platform.on('ready', function (options) {
 
 	server.on('error', function (error) {
 		console.error('Server Error', error);
-		platform.sendError(error);
+		platform.handleException(error);
 	});
 
 	server.on('close', function () {
-		platform.sendClose();
+		platform.notifyClose();
 	});
 
 	server.listen();
@@ -58,10 +58,10 @@ platform.on('message', function (message) {
 		server.send(message.client, message.message, false, function (error) {
 			if (error) {
 				console.log('Message Sending Error', error);
-				platform.sendError(error);
+				platform.handleException(error);
 			}
 			else
-				platform.sendLog('Message Sent', message.message);
+				platform.log('Message Sent', message.message);
 		});
 	}
 	else if (message.client === '*') {
@@ -69,10 +69,10 @@ platform.on('message', function (message) {
 			server.send(client, message.message, false, function (error) {
 				if (error) {
 					console.log('Message Sending Error', error);
-					platform.sendError(error);
+					platform.handleException(error);
 				}
 				else
-					platform.sendLog('Message Sent', message.message);
+					platform.log('Message Sent', message.message);
 			});
 		});
 	}
