@@ -29,8 +29,10 @@ platform.on('ready', function (options) {
 		safeParse(data, function (error, result) {
 			if (error)
 				platform.handleException(error);
-			else
-				platform.processData(serverAddress, clientAddress, result, DATA_TYPE, size);
+			else {
+				// Send the JSON String data not the parsed data.
+				platform.processData(serverAddress, clientAddress, data, DATA_TYPE, size);
+			}
 		});
 
 		platform.sendLog('Raw Data Received', data);
