@@ -83,8 +83,7 @@ Server.prototype.close = function () {
 };
 
 Server.prototype.listen = function (callback) {
-	if (!callback)
-		callback = function () {
+	callback = callback || function () {
 		};
 
 	this._server.bind(this._port, this._host, callback);
