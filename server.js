@@ -2,29 +2,26 @@
 
 var dgram        = require('dgram'),
 	inherits     = require('util').inherits,
-	EventEmitter = require('events').EventEmitter,
-	_            = require('lodash');
+	EventEmitter = require('events').EventEmitter;
 
-function Server(port, host, socketType) {
+function Server(socketType) {
 	if (!(this instanceof Server)) {
-		return new Server(port, host, socketType);
+		return new Server(socketType);
 	}
 
 	EventEmitter.call(this);
-	Server.init.call(this, port, host, socketType);
+	Server.init.call(this, socketType);
 }
 
 inherits(Server, EventEmitter);
 
-Server.init = function (port, host, socketType) {
+Server.init = function (socketType) {
 	var self = this;
 
-	this._clients = {};
-	self._port = port || 4500;
-	self._host = host || 'localhost';
-	self._socketType = socketType || 'udp4';
+	self._clients = {};
+	socketType = socketType || 'udp4';
 
-	self._server = dgram.createSocket(self._socketType);
+	self._server = dgram.createSocket(socketType);
 
 	function handler(message, requestInfo) {
 		var client = requestInfo.address + ':' + requestInfo.port;
@@ -33,20 +30,20 @@ Server.init = function (port, host, socketType) {
 			port: requestInfo.port
 		};
 
-		self.emit('data', client, message.toString().replace(/\n$/, ''), requestInfo.size);
+		self.emit('data', client, message.toString().replace(/\n$/, ''));
 	}
 
-	function listening() {
+	var listening = function () {
 		self.emit('ready');
-	}
+	};
 
-	function close() {
+	var close = function () {
 		self.emit('close');
-	}
+	};
 
-	function error(err) {
+	var error = function (err) {
 		self.emit('error', err);
-	}
+	};
 
 	process.nextTick(function register() {
 		self._server.on('listening', listening);
@@ -60,33 +57,32 @@ Server.prototype.send = function (client, message, callback) {
 	callback = callback || function () {
 		};
 
-	if (!Buffer.isBuffer(message)) {
+	if (!Buffer.isBuffer(message))
 		message = new Buffer(message.toString() + '\n');
-	}
 
-	if (_.contains(_.keys(this._clients), client)) {
+	if (this._clients[client]) {
 		var clientObj = this._clients[client];
 
 		this._server.send(message, 0, message.length, clientObj.port, clientObj.host, callback);
-	} else {
-		callback();
 	}
+	else
+		callback();
 };
 
 Server.prototype.getClients = function () {
-	return _.keys(this._clients);
+	return this._clients;
 };
 
-Server.prototype.close = function () {
+Server.prototype.close = function (callback) {
 	this._server.close();
-	return 1;
+	callback();
 };
 
-Server.prototype.listen = function (callback) {
+Server.prototype.listen = function (port, host, callback) {
 	callback = callback || function () {
 		};
 
-	this._server.bind(this._port, this._host, callback);
+	this._server.bind(port, host, callback);
 };
 
 module.exports = Server;
