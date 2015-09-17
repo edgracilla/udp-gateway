@@ -1,6 +1,6 @@
 {
-  "name": "udp-endpoint",
-  "description": "JSON UDP Endpoint Plugin for the Reekoh IoT Platform.",
+  "name": "udp-gateway",
+  "description": "JSON UDP Gateway Plugin for the Reekoh IoT Platform.",
   "version": "0.0.1",
   "author": "Reekoh, Inc.",
   "main": "app.js",
@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Reekoh/udp-endpoint"
+    "url": "https://github.com/Reekoh/udp-gateway"
   },
   "dependencies": {
     "ip": "^0.3.3",
