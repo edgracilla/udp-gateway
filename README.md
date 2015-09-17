@@ -1,11 +1,11 @@
-# UDP Endpoint
+# UDP Gateway
 
-[![Build Status](https://travis-ci.org/Reekoh/udp-endpoint.svg)](https://travis-ci.org/Reekoh/udp-endpoint)
-![Dependencies](https://img.shields.io/david/Reekoh/udp-endpoint.svg)
-![Dev Dependencies](https://img.shields.io/david/dev/Reekoh/udp-endpoint.svg)
+[![Build Status](https://travis-ci.org/Reekoh/udp-gateway.svg)](https://travis-ci.org/Reekoh/udp-gateway)
+![Dependencies](https://img.shields.io/david/Reekoh/udp-gateway.svg)
+![Dev Dependencies](https://img.shields.io/david/dev/Reekoh/udp-gateway.svg)
 ![Built With](https://img.shields.io/badge/built%20with-gulp-red.svg)
 
-JSON TCP Endpoint Plugin for the Reekoh IoT Platform.
+JSON UDP Gateway Plugin for the Reekoh IoT Platform.
 
 **Assumptions:**
 
