@@ -5,6 +5,25 @@ var server, serverAddress,
 	UDPServer = require('./server');
 
 /*
+ * Listen for the message event. Send these messages/commands to devices to this server.
+ */
+platform.on('message', function (message) {
+	if (server.getClients()[message.client]) {
+		server.send(message.client, message.message, function (error) {
+			if (error) {
+				console.error('Message Sending Error', error);
+				platform.sendMessageResponse(message.messageId, error.name);
+				platform.handleException(error);
+			}
+			else {
+				platform.sendMessageResponse(message.messageId, 'Message Sent');
+				platform.log('Message Sent', message.message);
+			}
+		});
+	}
+});
+
+/*
  * Listen for the ready event.
  */
 platform.once('ready', function (options) {
@@ -48,23 +67,4 @@ platform.once('ready', function (options) {
 	});
 
 	server.listen(options.port, host);
-});
-
-/*
- * Listen for the message event. Send these messages/commands to devices to this server.
- */
-platform.on('message', function (message) {
-	if (server.getClients()[message.client]) {
-		server.send(message.client, message.message, function (error) {
-			if (error) {
-				console.error('Message Sending Error', error);
-				platform.sendMessageResponse(message.messageId, error.name);
-				platform.handleException(error);
-			}
-			else {
-				platform.sendMessageResponse(message.messageId, 'Message Sent');
-				platform.log('Message Sent', message.message);
-			}
-		});
-	}
 });
