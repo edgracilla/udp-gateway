@@ -2,7 +2,8 @@
 
 var server, serverAddress,
 	platform  = require('./platform'),
-	UDPServer = require('./server');
+	UDPServer = require('./server'),
+	config    = require('./config.json');
 
 /*
  * Listen for the message event. Send these messages/commands to devices to this server.
@@ -34,7 +35,7 @@ platform.once('ready', function (options) {
 
 	serverAddress = host + '' + options.port;
 
-	server = new UDPServer();
+	server = new UDPServer(options.socket_type || config.socket_type.default);
 
 	server.on('ready', function () {
 		platform.notifyReady();
@@ -48,7 +49,7 @@ platform.once('ready', function (options) {
 			var obj = JSON.parse(data);
 
 			if (obj.type === 'data')
-				platform.processData(obj.device, client, obj.data);
+				platform.processData(obj.device, obj.data);
 			else if (obj.type === 'message')
 				platform.sendMessageToDevice(obj.target, obj.message);
 			else if (obj.type === 'groupmessage')
