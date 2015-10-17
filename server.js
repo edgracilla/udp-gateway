@@ -19,7 +19,6 @@ Server.init = function (socketType) {
 	var self = this;
 
 	self._clients = {};
-	socketType = socketType || 'udp4';
 
 	self._server = dgram.createSocket(socketType);
 

@@ -1,1 +1,9 @@
-{}
+{
+  "socket_type": {
+	"type": "String",
+	"label": "Socket Type",
+	"enum": ["udp4", "udp6"],
+	"help": "The UDP Socket type.",
+	"default": "udp4"
+  }
+}
