@@ -49,7 +49,7 @@ platform.once('ready', function (options) {
 			var obj = JSON.parse(data);
 
 			if (obj.type === 'data')
-				platform.processData(obj.device, obj.data);
+				platform.processData(obj.device, data);
 			else if (obj.type === 'message')
 				platform.sendMessageToDevice(obj.target, obj.message);
 			else if (obj.type === 'groupmessage')
