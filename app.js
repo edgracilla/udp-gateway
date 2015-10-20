@@ -1,9 +1,7 @@
 'use strict';
 
 var server, serverAddress,
-	platform  = require('./platform'),
-	UDPServer = require('./server'),
-	config    = require('./config.json');
+	platform = require('./platform');
 
 /*
  * Listen for the message event. Send these messages/commands to devices to this server.
@@ -28,18 +26,17 @@ platform.on('message', function (message) {
  * Listen for the ready event.
  */
 platform.once('ready', function (options) {
-	var host          = require('ip').address(),
+	var config        = require('./config.json'),
+		isJSON        = require('is-json'),
+		UDPServer     = require('./server'),
 		StringDecoder = require('string_decoder').StringDecoder,
-		decoder       = new StringDecoder('utf8'),
-		isJSON        = require('is-json');
-
-	serverAddress = host + '' + options.port;
+		decoder       = new StringDecoder('utf8');
 
 	server = new UDPServer(options.socket_type || config.socket_type.default);
 
 	server.on('ready', function () {
 		platform.notifyReady();
-		console.log('UDP Server now listening on '.concat(host).concat(':').concat(options.port));
+		console.log('UDP Server now listening on port '.concat(options.port));
 	});
 
 	server.on('data', function (client, rawData) {
@@ -67,5 +64,5 @@ platform.once('ready', function (options) {
 		platform.notifyClose();
 	});
 
-	server.listen(options.port, host);
+	server.listen(options.port, '0.0.0.0');
 });
