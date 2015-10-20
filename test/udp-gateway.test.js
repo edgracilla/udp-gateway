@@ -3,7 +3,6 @@
 const HOST = '0.0.0.0',
 	  PORT = 8080;
 
-
 var cp     = require('child_process'),
 	assert = require('assert'),
 	gateway;
