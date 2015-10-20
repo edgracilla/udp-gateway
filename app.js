@@ -1,7 +1,7 @@
 'use strict';
 
-var server, serverAddress,
-	platform = require('./platform');
+var platform = require('./platform'),
+	server;
 
 /*
  * Listen for the message event. Send these messages/commands to devices to this server.
@@ -16,7 +16,7 @@ platform.on('message', function (message) {
 			}
 			else {
 				platform.sendMessageResponse(message.messageId, 'Message Sent');
-				platform.log('Message Sent', message.message);
+				platform.log(message.message);
 			}
 		});
 	}
@@ -53,7 +53,7 @@ platform.once('ready', function (options) {
 				platform.sendMessageToGroup(obj.target, obj.message);
 		}
 
-		platform.log('Raw Data Received', data);
+		platform.log(data);
 	});
 
 	server.on('error', function (error) {
@@ -64,5 +64,5 @@ platform.once('ready', function (options) {
 		platform.notifyClose();
 	});
 
-	server.listen(options.port, options.host);
+	server.listen(options.port, '0.0.0.0');
 });
