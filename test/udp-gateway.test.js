@@ -12,7 +12,13 @@ describe('UDP Gateway', function () {
 	this.slow(8000);
 
 	after('terminate child process', function () {
-		udpGateway.kill('SIGKILL');
+		udpGateway.send({
+			type: 'close'
+		});
+
+		setTimeout(function () {
+			udpGateway.kill('SIGKILL');
+		}, 4500);
 	});
 
 	describe('#spawn', function () {
