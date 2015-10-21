@@ -1,39 +1,43 @@
 'use strict';
 
-const PORT = 8080;
+const PORT       = 8080,
+	  CLIENT_ID1 = '567827489028375',
+	  CLIENT_ID2 = '567827489028376';
 
 var cp     = require('child_process'),
 	assert = require('assert'),
-	gateway;
+	udpGateway;
 
-describe('Gateway', function () {
-	this.slow(5000);
+describe('UDP Gateway', function () {
+	this.slow(8000);
 
 	after('terminate child process', function () {
-		gateway.kill('SIGKILL');
+		udpGateway.kill('SIGKILL');
 	});
 
 	describe('#spawn', function () {
 		it('should spawn a child process', function () {
-			assert.ok(gateway = cp.fork(process.cwd()), 'Child process not spawned.');
+			assert.ok(udpGateway = cp.fork(process.cwd()), 'Child process not spawned.');
 		});
 	});
 
 	describe('#handShake', function () {
-		it('should notify the parent process when ready within 5 seconds', function (done) {
-			this.timeout(5000);
+		it('should notify the parent process when ready within 8 seconds', function (done) {
+			this.timeout(8000);
 
-			gateway.on('message', function (message) {
+			udpGateway.on('message', function (message) {
 				if (message.type === 'ready')
 					done();
 			});
+			console.log('Sending READY...');
 
-			gateway.send({
+			udpGateway.send({
 				type: 'ready',
 				data: {
 					options: {
 						port: PORT
-					}
+					},
+					devices: [{_id: CLIENT_ID1}, {_id: CLIENT_ID2}]
 				}
 			}, function (error) {
 				assert.ifError(error);
@@ -43,7 +47,7 @@ describe('Gateway', function () {
 
 	describe('#message', function () {
 		it('should process the message', function (done) {
-			gateway.send({
+			udpGateway.send({
 				type: 'message',
 				data: {
 					client: '571826372902789',

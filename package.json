@@ -12,7 +12,8 @@
     "url": "https://github.com/Reekoh/udp-gateway"
   },
   "dependencies": {
-    "is-json": "^1.2.5"
+    "is-json": "^1.2.5",
+    "lodash": "^3.10.1"
   },
   "devDependencies": {
     "gulp": "^3.9.0",

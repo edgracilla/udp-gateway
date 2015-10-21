@@ -3,7 +3,7 @@
 	"type": "String",
 	"label": "Socket Type",
 	"enum": ["udp4", "udp6"],
-	"help": "The UDP Socket type.",
+	"help": "(Optional) The UDP Socket type. Default: udp4",
 	"default": "udp4"
   }
 }
