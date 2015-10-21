@@ -12,6 +12,8 @@ describe('UDP Gateway', function () {
 	this.slow(8000);
 
 	after('terminate child process', function () {
+		this.timeout(5000);
+
 		udpGateway.send({
 			type: 'close'
 		});
