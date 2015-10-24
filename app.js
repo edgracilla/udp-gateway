@@ -4,7 +4,7 @@ var dgram             = require('dgram'),
 	platform          = require('./platform'),
 	clients           = {},
 	authorizedDevices = {},
-	server;
+	server, port;
 
 /*
  * Listen for the message event. Send these messages/commands to devices from this server.
@@ -59,8 +59,20 @@ platform.on('removedevice', function (device) {
 /*
  * Event to listen to in order to gracefully release all resources bound to this service.
  */
+/*
+ * Event to listen to in order to gracefully release all resources bound to this service.
+ */
 platform.on('close', function () {
-	server.close();
+	try {
+		server.close(function () {
+			console.log('UDP Gateway closed on port ' + port);
+			platform.notifyClose();
+		});
+	}
+	catch (err) {
+		console.error('Error closing UDP Gateway on port ' + port, err);
+		platform.handleException(err);
+	}
 });
 
 /*
@@ -81,6 +93,7 @@ platform.once('ready', function (options, registeredDevices) {
 	var socketType = options.socket_type || config.socket_type.default;
 
 	server = dgram.createSocket(socketType);
+	port = options.port;
 
 	server.on('listening', function () {
 		platform.log('UDP Gateway initialized on port ' + options.port);
@@ -154,17 +167,13 @@ platform.once('ready', function (options, registeredDevices) {
 		}
 	});
 
-	server.on('close', function () {
-		platform.notifyClose();
-	});
-
 	server.on('error', function (error) {
 		console.error('UDP Gateway Error', error);
 		platform.handleException(error);
 	});
 
 	server.bind({
-		port: options.port,
+		port: port,
 		exclusive: false
 	});
 });
