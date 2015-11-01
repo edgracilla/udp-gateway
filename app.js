@@ -16,7 +16,9 @@ platform.on('message', function (message) {
 		if (!Buffer.isBuffer(msg))
 			msg = new Buffer(msg + '\n');
 
-		clients[message.device].write(msg, function () {
+		var client = clients[message.device];
+
+		server.send(msg, 0, msg.length, client.port, client.address, function () {
 			platform.sendMessageResponse(message.messageId, 'Message Sent');
 			platform.log(JSON.stringify({
 				title: 'Message Sent',
@@ -129,7 +131,7 @@ platform.once('ready', function (options, registeredDevices) {
 
 				if (_.isEmpty(clients[obj.device])) {
 					clients[obj.device] = {
-						host: rinfo.address,
+						address: rinfo.address,
 						port: rinfo.port
 					};
 				}
