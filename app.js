@@ -1,6 +1,7 @@
 'use strict';
 
-var dgram             = require('dgram'),
+var domain            = require('domain'),
+	isEmpty           = require('lodash.isempty'),
 	platform          = require('./platform'),
 	clients           = {},
 	authorizedDevices = {},
@@ -34,9 +35,7 @@ platform.on('message', function (message) {
  * When a new device is added, add it to the list of authorized devices.
  */
 platform.on('adddevice', function (device) {
-	var _ = require('lodash');
-
-	if (!_.isEmpty(device) && !_.isEmpty(device._id)) {
+	if (!isEmpty(device) && !isEmpty(device._id)) {
 		authorizedDevices[device._id] = device;
 		platform.log('Successfully added ' + device._id + ' to the pool of authorized devices.');
 	}
@@ -48,9 +47,7 @@ platform.on('adddevice', function (device) {
  * When a device is removed or deleted, remove it from the list of authorized devices.
  */
 platform.on('removedevice', function (device) {
-	var _ = require('lodash');
-
-	if (!_.isEmpty(device) && !_.isEmpty(device._id)) {
+	if (!isEmpty(device) && !isEmpty(device._id)) {
 		delete authorizedDevices[device._id];
 		platform.log('Successfully removed ' + device._id + ' from the pool of authorized devices.');
 	}
@@ -65,16 +62,15 @@ platform.on('removedevice', function (device) {
  * Event to listen to in order to gracefully release all resources bound to this service.
  */
 platform.on('close', function () {
-	var domain = require('domain');
-	var d = domain.create();
+	var closeDomain = domain.create();
 
-	d.on('error', function (error) {
+	closeDomain.once('error', function (error) {
 		console.error('Error closing UDP Gateway on port ' + port, error);
 		platform.handleException(error);
 		platform.notifyClose();
 	});
 
-	d.run(function () {
+	closeDomain.run(function () {
 		server.close(function () {
 			console.log('UDP Gateway closed on port ' + port);
 			platform.notifyClose();
@@ -86,14 +82,15 @@ platform.on('close', function () {
  * Listen for the ready event.
  */
 platform.once('ready', function (options, registeredDevices) {
-	var _      = require('lodash'),
-		isJSON = require('is-json'),
-		config = require('./config.json');
+	var dgram        = require('dgram'),
+		clone        = require('lodash.clone'),
+		config       = require('./config.json');
 
-	if (!_.isEmpty(registeredDevices)) {
-		var tmpDevices = _.clone(registeredDevices, true);
+	if (!isEmpty(registeredDevices)) {
+		var indexBy    = require('lodash.indexby'),
+			tmpDevices = clone(registeredDevices, true);
 
-		authorizedDevices = _.indexBy(tmpDevices, '_id');
+		authorizedDevices = indexBy(tmpDevices, '_id');
 	}
 
 	var msg;
@@ -108,22 +105,35 @@ platform.once('ready', function (options, registeredDevices) {
 	});
 
 	server.on('message', function (data, rinfo) {
-		data = data.toString().replace(/\n$/, '');
+		var socketDomain = require('domain').create();
 
-		if (isJSON(data)) {
+		socketDomain.once('error', function () {
+			msg = new Buffer('Invalid data sent. This UDP Gateway only accepts JSON data.\n');
+
+			server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
+			socketDomain.exit();
+		});
+
+		socketDomain.run(function () {
+			data = data.toString().replace(/\n$/, '');
+
 			var obj = JSON.parse(data);
 
-			if (_.isEmpty(obj.device)) return;
+			if (isEmpty(obj.device)) return socketDomain.exit();
 
-			if (_.isEmpty(authorizedDevices[obj.device])) {
+			if (isEmpty(authorizedDevices[obj.device])) {
 				platform.log(JSON.stringify({
 					title: 'Unauthorized Device',
 					device: obj.device
 				}));
 
+				socketDomain.removeAllListeners('error');
+
 				msg = new Buffer('Access Denied. Unauthorized Device.\n');
 
-				return server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
+				server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
+
+				return socketDomain.exit();
 			}
 
 			if (obj.type === 'data') {
@@ -134,7 +144,7 @@ platform.once('ready', function (options, registeredDevices) {
 					data: data
 				}));
 
-				if (_.isEmpty(clients[obj.device])) {
+				if (isEmpty(clients[obj.device])) {
 					clients[obj.device] = {
 						address: rinfo.address,
 						port: rinfo.port
@@ -164,14 +174,11 @@ platform.once('ready', function (options, registeredDevices) {
 			else {
 				msg = new Buffer('Invalid data. One or more fields missing. [device, type] are required for data. [device, type, target, message] are required for messages.\n');
 
-				return server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
+				server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 			}
-		}
-		else {
-			msg = new Buffer('Invalid data sent. This TCP Gateway only accepts JSON data.\n');
 
-			return server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
-		}
+			socketDomain.exit();
+		});
 	});
 
 	server.on('error', function (error) {
