@@ -1,7 +1,7 @@
 {
   "name": "udp-gateway",
   "description": "JSON UDP Gateway Plugin for the Reekoh IoT Platform.",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "author": "Reekoh, Inc.",
   "main": "app.js",
   "scripts": {
