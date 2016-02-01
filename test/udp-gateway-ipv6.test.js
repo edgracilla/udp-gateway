@@ -1,6 +1,6 @@
 'use strict';
 
-const PORT       = 8080,
+const PORT       = 8081,
 	  CLIENT_ID1 = '567827489028375',
 	  CLIENT_ID2 = '567827489028376';
 
@@ -37,13 +37,13 @@ describe('UDP Gateway', function () {
 				if (message.type === 'ready')
 					done();
 			});
-			console.log('Sending READY...');
 
 			udpGateway.send({
 				type: 'ready',
 				data: {
 					options: {
-						port: PORT
+						port: PORT,
+						socket_type: 'udp6'
 					},
 					devices: [{_id: CLIENT_ID1}, {_id: CLIENT_ID2}]
 				}
@@ -58,7 +58,7 @@ describe('UDP Gateway', function () {
 			udpGateway.send({
 				type: 'message',
 				data: {
-					client: '571826372902789',
+					client: '567827489028376',
 					messageId: '55fce1455167c470abeedae2',
 					message: 'TURNOFF'
 				}
