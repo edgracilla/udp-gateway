@@ -7,27 +7,6 @@ var domain            = require('domain'),
 	authorizedDevices = {},
 	server, port;
 
-platform.on('message', function (message) {
-	if (clients[message.device]) {
-		let msg = message.message || new Buffer([0x00]);
-
-		if (!Buffer.isBuffer(msg))
-			msg = new Buffer(`${msg}\n`);
-
-		let client = clients[message.device];
-
-		server.send(msg, 0, msg.length, client.port, client.address, () => {
-			platform.sendMessageResponse(message.messageId, 'Message Sent');
-			platform.log(JSON.stringify({
-				title: 'Message Sent',
-				device: message.device,
-				messageId: message.messageId,
-				message: message.message
-			}));
-		});
-	}
-});
-
 /*
  * When a new device is added, add it to the list of authorized devices.
  */
@@ -105,8 +84,6 @@ platform.once('ready', function (options, registeredDevices) {
 
 		d.once('error', () => {
 			msg = new Buffer('Invalid data sent. Data must be a valid JSON String with a "topic" field and a "device" field which corresponds to a registered Device ID.\n');
-
-			server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 			d.exit();
 		});
 
@@ -131,8 +108,6 @@ platform.once('ready', function (options, registeredDevices) {
 
 				msg = new Buffer('Access Denied. Unauthorized Device.\n');
 
-				server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
-
 				return d.exit();
 			}
 
@@ -140,7 +115,6 @@ platform.once('ready', function (options, registeredDevices) {
 				msg = new Buffer('Invalid data sent. No "topic" specified in JSON.\n');
 
 				platform.handleException(new Error('Invalid data sent. No "topic" specified in JSON.'));
-				server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 
 				return d.exit();
 			}
@@ -161,14 +135,12 @@ platform.once('ready', function (options, registeredDevices) {
 				}
 
 				msg = new Buffer('Data Processed\n');
-				server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 			}
 			else if (obj.topic === messageTopic) {
 				if (isEmpty(obj.target) || isEmpty(obj.message)) {
 					msg = new Buffer('Invalid message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the a registered Device ID. "message" is the payload.\n');
 
 					platform.handleException(new Error('Invalid message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the a registered Device ID. "message" is the payload.'));
-					server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 
 					return d.exit();
 				}
@@ -183,14 +155,11 @@ platform.once('ready', function (options, registeredDevices) {
 				}));
 
 				msg = new Buffer('Message Processed\n');
-				server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 			}
 			else if (obj.topic === groupMessageTopic) {
 				if (isEmpty(obj.target) || isEmpty(obj.message)) {
 					msg = new Buffer('Invalid group message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the the group name. "message" is the payload.\n');
 					platform.handleException(new Error('Invalid group message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the the group name. "message" is the payload.'));
-
-					server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 
 					return d.exit();
 				}
@@ -205,14 +174,10 @@ platform.once('ready', function (options, registeredDevices) {
 				}));
 
 				msg = new Buffer('Group Message Processed\n');
-
-				server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 			}
 			else {
 				platform.handleException(new Error(`Invalid topic specified. Topic: ${obj.topic}`));
 				msg = new Buffer(`Invalid topic specified. Topic: ${obj.topic}\n`);
-
-				server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 			}
 
 			d.exit();
