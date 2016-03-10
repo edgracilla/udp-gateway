@@ -52,17 +52,4 @@ describe('UDP Gateway', function () {
 			});
 		});
 	});
-
-	describe('#message', function () {
-		it('should process the message', function (done) {
-			udpGateway.send({
-				type: 'message',
-				data: {
-					client: '567827489028375',
-					messageId: '55fce1455167c470abeedae2',
-					message: 'TURNOFF'
-				}
-			}, done);
-		});
-	});
 });
