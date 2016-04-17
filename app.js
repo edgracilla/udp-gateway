@@ -81,7 +81,7 @@ platform.once('ready', function (options, registeredDevices) {
 		data = data.toString().replace(/\n$/g, '')
 
 		async.waterfall([
-			async.constant(data),
+			async.constant(data || '{}'),
 			async.asyncify(JSON.parse)
 		], (error, obj) => {
 			if (error || isEmpty(obj.device) || isEmpty(obj.topic)) return platform.handleException(new Error('Invalid data sent. Data must be a valid JSON String with a "topic" field and a "device" field which corresponds to a registered Device ID.'));
