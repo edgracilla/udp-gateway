@@ -1,6 +1,6 @@
 'use strict';
 
-var domain            = require('domain'),
+var async             = require('async'),
 	isEmpty           = require('lodash.isempty'),
 	platform          = require('./platform'),
 	clients           = {},
@@ -38,15 +38,15 @@ platform.on('removedevice', function (device) {
  * Event to listen to in order to gracefully release all resources bound to this service.
  */
 platform.on('close', function () {
-	let d = domain.create();
+	let d = require('domain').create();
 
-	d.once('error', (error) => {
+	d.once('error', function (error) {
 		console.error(`Error closing UDP Gateway on port ${port}`, error);
 		platform.handleException(error);
 		platform.notifyClose();
 	});
 
-	d.run(() => {
+	d.run(function () {
 		server.close(() => {
 			console.log(`UDP Gateway closed on port ${port}`);
 			platform.notifyClose();
@@ -58,15 +58,14 @@ platform.on('close', function () {
  * Listen for the ready event.
  */
 platform.once('ready', function (options, registeredDevices) {
-	let dgram      = require('dgram'),
-		keyBy      = require('lodash.keyby'),
-		config     = require('./config.json'),
-		socketType = options.socket_type || config.socket_type.default;
+	let dgram  = require('dgram'),
+		keyBy  = require('lodash.keyby'),
+		config = require('./config.json');
 
 	if (!isEmpty(registeredDevices))
 		authorizedDevices = keyBy(registeredDevices, '_id');
 
-	server = dgram.createSocket(socketType);
+	server = dgram.createSocket();
 	port = options.port;
 
 	let dataTopic = options.data_topic || config.data_topic.default;
@@ -79,38 +78,22 @@ platform.once('ready', function (options, registeredDevices) {
 	});
 
 	server.on('message', (data, rinfo) => {
-		let d = require('domain').create();
+		data = data.toString().replace(/\n$/g, '')
 
-		d.once('error', function () {
-			d.exit();
-		});
-
-		d.run(() => {
-			data = data.toString().replace(/\n$/g, '');
-
-			let obj = JSON.parse(data);
-
-			if (isEmpty(obj.device)) {
-				platform.handleException(new Error('Invalid data sent. Data must be a valid JSON String with a "topic" field and a "device" field which corresponds to a registered Device ID.'));
-
-				return d.exit();
-			}
+		async.waterfall([
+			async.constant(data),
+			async.asyncify(JSON.parse)
+		], (error, obj) => {
+			if (error || isEmpty(obj.device) || isEmpty(obj.topic)) return platform.handleException(new Error('Invalid data sent. Data must be a valid JSON String with a "topic" field and a "device" field which corresponds to a registered Device ID.'));
 
 			if (isEmpty(authorizedDevices[obj.device])) {
-				platform.log(JSON.stringify({
+				return platform.log(JSON.stringify({
 					title: 'UDP Gateway - Access Denied. Unauthorized Device',
 					device: obj.device
 				}));
-
-				return d.exit();
 			}
 
-			if (isEmpty(obj.topic)) {
-				platform.handleException(new Error('Invalid data sent. No "topic" specified in JSON.'));
-
-				return d.exit();
-			}
-			else if (obj.topic === dataTopic) {
+			if (obj.topic === dataTopic) {
 				platform.processData(obj.device, data);
 
 				platform.log(JSON.stringify({
@@ -127,11 +110,7 @@ platform.once('ready', function (options, registeredDevices) {
 				}
 			}
 			else if (obj.topic === messageTopic) {
-				if (isEmpty(obj.target) || isEmpty(obj.message)) {
-					platform.handleException(new Error('Invalid message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the a registered Device ID. "message" is the payload.'));
-
-					return d.exit();
-				}
+				if (isEmpty(obj.target) || isEmpty(obj.message)) return platform.handleException(new Error('Invalid message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the a registered Device ID. "message" is the payload.'));
 
 				platform.sendMessageToDevice(obj.target, obj.message);
 
@@ -143,11 +122,7 @@ platform.once('ready', function (options, registeredDevices) {
 				}));
 			}
 			else if (obj.topic === groupMessageTopic) {
-				if (isEmpty(obj.target) || isEmpty(obj.message)) {
-					platform.handleException(new Error('Invalid group message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the the group name. "message" is the payload.'));
-
-					return d.exit();
-				}
+				if (isEmpty(obj.target) || isEmpty(obj.message)) return platform.handleException(new Error('Invalid group message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the the group id or name. "message" is the payload.'));
 
 				platform.sendMessageToGroup(obj.target, obj.message);
 
@@ -160,8 +135,6 @@ platform.once('ready', function (options, registeredDevices) {
 			}
 			else
 				platform.handleException(new Error(`Invalid topic specified. Topic: ${obj.topic}`));
-
-			d.exit();
 		});
 	});
 
