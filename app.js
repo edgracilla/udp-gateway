@@ -78,7 +78,7 @@ platform.once('ready', function (options, registeredDevices) {
 	});
 
 	server.on('message', (data, rinfo) => {
-		data = data.toString().replace(/\n$/g, '')
+		data = data.toString().replace(/\n$/g, '');
 
 		async.waterfall([
 			async.constant(data || '{}'),
