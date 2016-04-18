@@ -65,7 +65,7 @@ platform.once('ready', function (options, registeredDevices) {
 	if (!isEmpty(registeredDevices))
 		authorizedDevices = keyBy(registeredDevices, '_id');
 
-	server = dgram.createSocket();
+	server = dgram.createSocket('udp4');
 	port = options.port;
 
 	let dataTopic = options.data_topic || config.data_topic.default;
