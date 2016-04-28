@@ -42,10 +42,8 @@ describe('UDP Gateway', function () {
 				type: 'ready',
 				data: {
 					options: {
-						port: PORT,
-						socket_type: 'udp4'
-					},
-					devices: [{_id: CLIENT_ID1}, {_id: CLIENT_ID2}]
+						port: PORT
+					}
 				}
 			}, function (error) {
 				assert.ifError(error);
