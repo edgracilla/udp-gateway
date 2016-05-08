@@ -54,11 +54,13 @@ platform.once('ready', function (options) {
 			if (error || isEmpty(obj.device) || isEmpty(obj.topic)) return platform.handleException(new Error('Invalid data sent. Data must be a valid JSON String with a "topic" field and a "device" field which corresponds to a registered Device ID.'));
 
 			platform.requestDeviceInfo(obj.device, (error, requestId) => {
-				setTimeout(() => {
+				let t = setTimeout(() => {
 					platform.removeAllListeners(requestId);
 				}, 5000);
 
 				platform.once(requestId, (deviceInfo) => {
+					clearTimeout(t);
+
 					if (isEmpty(deviceInfo)) {
 						return platform.log(JSON.stringify({
 							title: 'UDP Gateway - Access Denied. Unauthorized Device',
