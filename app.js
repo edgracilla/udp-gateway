@@ -4,7 +4,7 @@ var async    = require('async'),
 	isEmpty  = require('lodash.isempty'),
 	platform = require('./platform'),
 	clients  = {},
-	server, port;
+	socket;
 
 platform.on('message', function (message) {
 	if (!isEmpty(clients[message.device])) {
@@ -13,7 +13,7 @@ platform.on('message', function (message) {
 		if (!Buffer.isBuffer(msg))
 			msg = new Buffer(`${msg}\n`);
 
-		server.send(msg, 0, msg.length, clients[message.device].port, clients[message.device].address, () => {
+		socket.send(msg, 0, msg.length, clients[message.device].port, clients[message.device].address, () => {
 			platform.sendMessageResponse(message.messageId, 'Message Sent');
 
 			platform.log(JSON.stringify({
@@ -33,15 +33,15 @@ platform.on('close', function () {
 	let d = require('domain').create();
 
 	d.once('error', function (error) {
-		console.error(`Error closing UDP Gateway on port ${port}`, error);
 		platform.handleException(error);
 		platform.notifyClose();
 	});
 
 	d.run(function () {
-		server.close(() => {
-			console.log(`UDP Gateway closed on port ${port}`);
+		socket.close(() => {
+			socket.removeAllListeners();
 			platform.notifyClose();
+			d.exit();
 		});
 	});
 });
@@ -53,19 +53,34 @@ platform.once('ready', function (options) {
 	let dgram  = require('dgram'),
 		config = require('./config.json');
 
-	server = dgram.createSocket('udp4');
-	port = options.port;
+	socket = dgram.createSocket('udp4');
 
 	let dataTopic = options.data_topic || config.data_topic.default;
 	let messageTopic = options.message_topic || config.message_topic.default;
 	let groupMessageTopic = options.groupmessage_topic || config.groupmessage_topic.default;
 
-	server.on('listening', () => {
+	socket.once('error', (error) => {
+		console.error('UDP Gateway Error', error);
+		platform.handleException(error);
+
+		setTimeout(() => {
+			socket.close(() => {
+				socket.removeAllListeners();
+				process.exit();
+			});
+		}, 5000);
+	});
+
+	socket.once('listening', () => {
 		platform.log(`UDP Gateway initialized on port ${options.port}`);
 		platform.notifyReady();
 	});
 
-	server.on('message', (data, rinfo) => {
+	socket.once('close', () => {
+		platform.log(`UDP Gateway closed on port ${options.port}`);
+	});
+
+	socket.on('message', (data, rinfo) => {
 		data = data.toString().replace(/\n$/g, '');
 
 		async.waterfall([
@@ -84,7 +99,7 @@ platform.once('ready', function (options) {
 					if (isEmpty(deviceInfo)) {
 						let msg = new Buffer(`Device not registered. Device ID: ${obj.device}\n`);
 
-						server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
+						socket.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 
 						return platform.log(JSON.stringify({
 							title: 'UDP Gateway - Access Denied. Unauthorized Device',
@@ -97,7 +112,7 @@ platform.once('ready', function (options) {
 
 						let msg = new Buffer(`Data Received. Device ID: ${obj.device}. Data: ${data}\n`);
 
-						server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
+						socket.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 
 						platform.log(JSON.stringify({
 							title: 'UDP Gateway Data Received.',
@@ -109,7 +124,7 @@ platform.once('ready', function (options) {
 						if (isEmpty(obj.target) || isEmpty(obj.message)) {
 							let msg = new Buffer('Invalid message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the a registered Device ID. "message" is the payload.\n');
 
-							server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
+							socket.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 							return platform.handleException(new Error('Invalid message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the a registered Device ID. "message" is the payload.'));
 						}
 
@@ -117,7 +132,7 @@ platform.once('ready', function (options) {
 
 						let msg = new Buffer(`Message Received. Device ID: ${obj.device}. Message: ${data}\n`);
 
-						server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
+						socket.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 
 						platform.log(JSON.stringify({
 							title: 'UDP Gateway Message Sent.',
@@ -130,7 +145,7 @@ platform.once('ready', function (options) {
 						if (isEmpty(obj.target) || isEmpty(obj.message)) {
 							let msg = new Buffer('Invalid group message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the the group id or name. "message" is the payload.\n');
 
-							server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
+							socket.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 							return platform.handleException(new Error('Invalid group message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the the group id or name. "message" is the payload.'));
 						}
 
@@ -138,7 +153,7 @@ platform.once('ready', function (options) {
 
 						let msg = new Buffer(`Message Received. Device ID: ${obj.device}. Message: ${data}\n`);
 
-						server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
+						socket.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 
 						platform.log(JSON.stringify({
 							title: 'UDP Gateway Group Message Sent.',
@@ -151,22 +166,12 @@ platform.once('ready', function (options) {
 						let msg = new Buffer(`Invalid topic specified. Topic: ${obj.topic}`);
 
 						platform.handleException(new Error(`Invalid topic specified. Topic: ${obj.topic}`));
-						server.send(msg, 0, msg.length, rinfo.port, rinfo.address);
+						socket.send(msg, 0, msg.length, rinfo.port, rinfo.address);
 					}
 				});
 			});
 		});
 	});
 
-	server.on('error', (error) => {
-		console.error('UDP Gateway Error', error);
-		platform.handleException(error);
-		server.close();
-
-		setTimeout(() => {
-			process.exit();
-		}, 5000);
-	});
-
-	server.bind(port);
+	socket.bind(options.port);
 });
