@@ -1,11 +1,9 @@
 'use strict';
 
-const PORT       = 8080,
-	  CLIENT_ID1 = '567827489028375',
-	  CLIENT_ID2 = '567827489028376';
+const PORT = 8080;
 
 var cp     = require('child_process'),
-	assert = require('assert'),
+	should = require('should'),
 	udpGateway;
 
 describe('UDP Gateway', function () {
@@ -25,7 +23,7 @@ describe('UDP Gateway', function () {
 
 	describe('#spawn', function () {
 		it('should spawn a child process', function () {
-			assert.ok(udpGateway = cp.fork(process.cwd()), 'Child process not spawned.');
+			should.ok(udpGateway = cp.fork(process.cwd()), 'Child process not spawned.');
 		});
 	});
 
@@ -46,7 +44,7 @@ describe('UDP Gateway', function () {
 					}
 				}
 			}, function (error) {
-				assert.ifError(error);
+				should.ifError(error);
 			});
 		});
 	});
