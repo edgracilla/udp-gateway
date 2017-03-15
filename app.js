@@ -1,177 +1,145 @@
-'use strict';
+'use strict'
 
-var async    = require('async'),
-	isEmpty  = require('lodash.isempty'),
-	platform = require('./platform'),
-	clients  = {},
-	socket;
+const reekoh = require('reekoh')
+const plugin = new reekoh.plugins.Gateway()
 
-platform.on('message', function (message) {
-	if (!isEmpty(clients[message.device])) {
-		let msg = message.message || new Buffer([0x00]);
+const async = require('async')
+const isEmpty = require('lodash.isempty')
 
-		if (!Buffer.isBuffer(msg))
-			msg = new Buffer(`${msg}\n`);
+let clients = {}
+let socket = null
 
-		socket.send(msg, 0, msg.length, clients[message.device].port, clients[message.device].address, () => {
-			platform.sendMessageResponse(message.messageId, 'Message Sent');
+plugin.once('ready', () => {
+  plugin.emit('init')
+  let dgram = require('dgram')
+  let options = plugin.config
 
-			platform.log(JSON.stringify({
-				title: 'UDP Gateway - Message Sent',
-				device: message.device,
-				messageId: message.messageId,
-				message: message.message
-			}));
-		});
-	}
-});
+  socket = dgram.createSocket('udp4')
 
-/*
- * Event to listen to in order to gracefully release all resources bound to this service.
- */
-platform.on('close', function () {
-	let d = require('domain').create();
+  let dataTopic = options.dataTopic
+  let commandTopic = options.commandTopic
 
-	d.once('error', function (error) {
-		platform.handleException(error);
-		platform.notifyClose();
-	});
+  let handleErr = (err) => {
+    console.error(err)
+    plugin.logException(err)
+  }
 
-	d.run(function () {
-		socket.close(() => {
-			socket.removeAllListeners();
-			platform.notifyClose();
-			d.exit();
-		});
-	});
-});
+  socket.once('error', (error) => {
+    console.error('UDP Gateway Error', error)
+    plugin.logException(error)
 
-/*
- * Listen for the ready event.
- */
-platform.once('ready', function (options) {
-	let dgram  = require('dgram'),
-		config = require('./config.json');
+    setTimeout(() => {
+      socket.close(() => {
+        socket.removeAllListeners()
+        process.exit()
+      })
+    }, 5000)
+  })
 
-	socket = dgram.createSocket('udp4');
+  socket.once('listening', () => {
+    plugin.log(`UDP Gateway initialized on port ${options.port}`)
+    plugin.emit('init')
+  })
 
-	let dataTopic = options.data_topic || config.data_topic.default;
-	let messageTopic = options.message_topic || config.message_topic.default;
-	let groupMessageTopic = options.groupmessage_topic || config.groupmessage_topic.default;
+  socket.once('close', () => {
+    plugin.log(`UDP Gateway closed on port ${options.port}`)
+  })
 
-	socket.once('error', (error) => {
-		console.error('UDP Gateway Error', error);
-		platform.handleException(error);
+  socket.on('message', (data, rinfo) => {
+    data = data.toString().replace(/\n$/g, '')
 
-		setTimeout(() => {
-			socket.close(() => {
-				socket.removeAllListeners();
-				process.exit();
-			});
-		}, 5000);
-	});
+    async.waterfall([
+      async.constant(data || '{}'),
+      async.asyncify(JSON.parse)
+    ], (error, obj) => {
+      if (error || isEmpty(obj.device) || isEmpty(obj.topic)) {
+        return plugin.logException(new Error('Invalid data sent. Data must be a valid JSON String with a "topic" field and a "device" field which corresponds to a registered Device ID.'))
+      }
 
-	socket.once('listening', () => {
-		platform.log(`UDP Gateway initialized on port ${options.port}`);
-		platform.notifyReady();
-	});
+      if (isEmpty(clients[obj.device])) {
+        clients[obj.device] = {
+          port: rinfo.port,
+          address: rinfo.address
+        }
+      }
 
-	socket.once('close', () => {
-		platform.log(`UDP Gateway closed on port ${options.port}`);
-	});
+      plugin.notifyConnection(obj.device)
 
-	socket.on('message', (data, rinfo) => {
-		data = data.toString().replace(/\n$/g, '');
+      plugin.requestDeviceInfo(obj.device).then((deviceInfo) => {
+        if (isEmpty(deviceInfo)) {
+          let msg = new Buffer(`Device not registered. Device ID: ${obj.device}\n`)
 
-		async.waterfall([
-			async.constant(data || '{}'),
-			async.asyncify(JSON.parse)
-		], (error, obj) => {
-			if (error || isEmpty(obj.device) || isEmpty(obj.topic)) return platform.handleException(new Error('Invalid data sent. Data must be a valid JSON String with a "topic" field and a "device" field which corresponds to a registered Device ID.'));
+          socket.send(msg, 0, msg.length, rinfo.port, rinfo.address)
 
-			if (isEmpty(clients[obj.device]))
-				clients[obj.device] = {address: rinfo.address, port: rinfo.port};
+          return plugin.log(JSON.stringify({
+            title: 'UDP Gateway - Access Denied. Unauthorized Device',
+            device: obj.device
+          }))
+        }
 
-			platform.notifyConnection(obj.device);
+        if (obj.topic === dataTopic) {
+          return plugin.pipe(obj).then(() => {
+            let msg = new Buffer(`Data Received. Device ID: ${obj.device}. Data: ${data}\n`)
 
-			platform.requestDeviceInfo(obj.device, (error, requestId) => {
-				platform.once(requestId, (deviceInfo) => {
-					if (isEmpty(deviceInfo)) {
-						let msg = new Buffer(`Device not registered. Device ID: ${obj.device}\n`);
+            socket.send(msg, 0, msg.length, rinfo.port, rinfo.address)
+            plugin.emit('data.ok')
 
-						socket.send(msg, 0, msg.length, rinfo.port, rinfo.address);
+            return plugin.log(JSON.stringify({
+              title: 'UDP Gateway Data Received.',
+              device: obj.device,
+              data: data
+            }))
+          }).catch(handleErr)
+        } else if (obj.topic === commandTopic) {
+          if (isEmpty(obj.command) || (isEmpty(obj.device) && isEmpty(obj.deviceGroup))) {
+            let msg = 'Invalid message or command. Message must be a valid JSON String with "device" or "deviceGroup" and "command" fields. "device" is the a registered Device ID. "command" is the payload.'
 
-						return platform.log(JSON.stringify({
-							title: 'UDP Gateway - Access Denied. Unauthorized Device',
-							device: obj.device
-						}));
-					}
+            return plugin
+              .logException(new Error(msg))
+              .then(() => socket.send(msg, 0, msg.length, rinfo.port, rinfo.address))
+          }
 
-					if (obj.topic === dataTopic) {
-						platform.processData(obj.device, data);
+          return plugin.relayCommand(obj.command, obj.target, obj.deviceGroup, obj.device).then(() => {
+            let msg = new Buffer(`Message Received. Device ID: ${obj.device}. Message: ${data}\n`)
 
-						let msg = new Buffer(`Data Received. Device ID: ${obj.device}. Data: ${data}\n`);
+            socket.send(msg, 0, msg.length, rinfo.port, rinfo.address)
+            plugin.emit('command.ok')
 
-						socket.send(msg, 0, msg.length, rinfo.port, rinfo.address);
+            return plugin.log(JSON.stringify({
+              title: 'UDP Gateway Message Sent.',
+              device: obj.device,
+              command: obj.command
+            }))
+          }).catch(handleErr)
+        } else {
+          let msg = new Buffer(`Invalid topic specified. Topic: ${obj.topic}`)
+          plugin.logException(new Error(`Invalid topic specified. Topic: ${obj.topic}`))
+          socket.send(msg, 0, msg.length, rinfo.port, rinfo.address)
+        }
+      }).catch(handleErr)
+    })
+  })
+  socket.bind(options.port)
+})
 
-						platform.log(JSON.stringify({
-							title: 'UDP Gateway Data Received.',
-							device: obj.device,
-							data: data
-						}));
-					}
-					else if (obj.topic === messageTopic) {
-						if (isEmpty(obj.target) || isEmpty(obj.message)) {
-							let msg = new Buffer('Invalid message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the a registered Device ID. "message" is the payload.\n');
+plugin.on('command', (msg) => {
+  if (!isEmpty(clients[msg.device])) {
+    let pkt = msg.message || new Buffer([0x00])
 
-							socket.send(msg, 0, msg.length, rinfo.port, rinfo.address);
-							return platform.handleException(new Error('Invalid message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the a registered Device ID. "message" is the payload.'));
-						}
+    if (!Buffer.isBuffer(pkt)) pkt = new Buffer(`${pkt}\n`)
 
-						platform.sendMessageToDevice(obj.target, obj.message);
+    socket.send(pkt, 0, pkt.length, clients[msg.device].port, clients[msg.device].address, () => {
+      plugin.sendCommandResponse(msg.commandId, 'Message Sent').then(() => {
+        plugin.emit('response.ok')
+        plugin.log(JSON.stringify({
+          title: 'UDP Gateway - Message Sent',
+          device: msg.device,
+          commandId: msg.commandId,
+          command: msg.command
+        }))
+      })
+    })
+  }
+})
 
-						let msg = new Buffer(`Message Received. Device ID: ${obj.device}. Message: ${data}\n`);
-
-						socket.send(msg, 0, msg.length, rinfo.port, rinfo.address);
-
-						platform.log(JSON.stringify({
-							title: 'UDP Gateway Message Sent.',
-							source: obj.device,
-							target: obj.target,
-							message: obj.message
-						}));
-					}
-					else if (obj.topic === groupMessageTopic) {
-						if (isEmpty(obj.target) || isEmpty(obj.message)) {
-							let msg = new Buffer('Invalid group message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the the group id or name. "message" is the payload.\n');
-
-							socket.send(msg, 0, msg.length, rinfo.port, rinfo.address);
-							return platform.handleException(new Error('Invalid group message or command. Message must be a valid JSON String with "target" and "message" fields. "target" is the the group id or name. "message" is the payload.'));
-						}
-
-						platform.sendMessageToGroup(obj.target, obj.message);
-
-						let msg = new Buffer(`Message Received. Device ID: ${obj.device}. Message: ${data}\n`);
-
-						socket.send(msg, 0, msg.length, rinfo.port, rinfo.address);
-
-						platform.log(JSON.stringify({
-							title: 'UDP Gateway Group Message Sent.',
-							source: obj.device,
-							target: obj.target,
-							message: obj.message
-						}));
-					}
-					else {
-						let msg = new Buffer(`Invalid topic specified. Topic: ${obj.topic}`);
-
-						platform.handleException(new Error(`Invalid topic specified. Topic: ${obj.topic}`));
-						socket.send(msg, 0, msg.length, rinfo.port, rinfo.address);
-					}
-				});
-			});
-		});
-	});
-
-	socket.bind(options.port);
-});
+module.exports = plugin
