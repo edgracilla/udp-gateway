@@ -185,7 +185,6 @@ describe('UDP Gateway', () => {
     })
 
     it('should be able to recieve command response', function (done) {
-
       let message = new Buffer(JSON.stringify({
         topic: 'command',
         device: '567827489028376',
